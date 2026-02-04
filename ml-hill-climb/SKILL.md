@@ -23,13 +23,16 @@ Never run an experiment without articulating WHY it should help. If you can't st
 
 Before touching a model:
 
-1. **EDA**: distributions, correlations, missingness, outliers, class balance
-2. **Eval framework**: create `eval_framework.py` with FIXED CV splits (stratified, seed=42). Use this for ALL experiments. Never change it.
-3. **Baselines**: run ElasticNet + one tree model (XGBoost). These set the floor.
-4. **Ceiling analysis**: run `scripts/ceiling_analysis.py` to estimate theoretical max R². Also do domain reasoning (e.g., HOMA = glucose × insulin / 405 → without insulin, ceiling is ~0.6).
-5. **Subgroup analysis**: performance by key splits (sex, age bins, feature quantiles)
-6. **Feature space visualization**: t-SNE or PCA colored by target, error, key features
-7. **Output**: post summary to reporting channel — "data has N samples, M features, target distribution is [X], theoretical ceiling ~[Y], baseline R²=[Z]"
+1. **EDA**: distributions, correlations, missingness, outliers, class balance (for classification)
+2. **Eval framework**: create `eval_framework.py` with FIXED CV splits (stratified, seed=42). Use for ALL experiments. Never change it.
+3. **Task-appropriate baselines**:
+   - Regression: ElasticNet + XGBoost
+   - Classification: LogisticRegression + XGBoost
+   - These set the floor.
+4. **Ceiling analysis**: run `scripts/ceiling_analysis.py` (regression) to estimate theoretical max. Also do domain reasoning — is there a formula relating target to features? What information is missing? What does prior work achieve?
+5. **Subgroup analysis**: performance by key categorical splits and feature quantiles
+6. **Feature space visualization**: t-SNE or PCA colored by target, prediction error, key features
+7. **Output**: post summary to reporting channel with sample count, feature count, target stats, ceiling estimate, baseline score
 
 Create `PROJECT_STATE.md` with all findings.
 
@@ -45,97 +48,109 @@ Create `PROJECT_STATE.md` with all findings.
 - `git commit` with results
 - Update `README.md` results table
 - Update `PROJECT_STATE.md`
-- Post to reporting channel: version / R² / what / why / next
+- Post to reporting channel: version / score / what / why / next
 
 ### Analysis checkpoints (every 3-5 versions):
-- Residual-feature correlations → is there unused signal?
+- Residual-feature correlations (regression) or confusion patterns (classification) → unused signal?
 - Subgroup breakdown → which groups improved/worsened?
-- Error correlation across models → is there ensemble diversity?
-- t-SNE of errors → are failures clustered or dispersed?
+- Error correlation across models → ensemble diversity?
+- t-SNE of errors → failures clustered or dispersed?
 - Use findings to generate NEXT hypothesis
 
-### What to try (in order of typical impact):
-1. Target transforms (log1p for skewed targets)
-2. Feature engineering (domain-specific interactions, ratios)
-3. Sample weighting (sqrt(y) for heavy-tailed targets)
+### Typical impact order (regression):
+1. Target transforms (log1p for right-skewed, sqrt for moderate skew)
+2. Feature engineering (domain interactions, ratios, polynomial terms)
+3. Sample weighting (upweight underrepresented regions of target)
 4. Hyperparameter tuning (Optuna, 50-100 trials)
-5. Diverse model types for blending (trees + linear)
+5. Diverse model blending (trees + linear for different error patterns)
 6. Input transforms (QuantileTransformer, StandardScaler)
-7. Loss functions (MAE, Huber for robust estimation)
+7. Loss functions (MAE/Huber for outlier robustness)
 
-### What usually DOESN'T work (check analysis first):
-- More trees when error correlations are >0.95
-- Stacking (often leaks — always verify with nested CV)
-- Neural nets at n<2000 on tabular data
-- Feature selection (trees handle irrelevant features)
-- Calibration/stretching predictions post-hoc
+### Typical impact order (classification):
+1. Class imbalance handling (SMOTE, class weights, threshold tuning)
+2. Feature engineering (domain interactions, ratios)
+3. Hyperparameter tuning (Optuna, 50-100 trials)
+4. Calibration (Platt scaling, isotonic)
+5. Diverse model blending (trees + linear + SVM)
+6. Threshold optimization (for F1, precision-recall tradeoff)
+
+### Common pitfalls (verify with analysis before trying):
+- Blending more of the same model family when error correlations >0.95
+- Stacking without nested CV (leakage risk — always verify)
+- Deep learning at n<2000 on tabular data (trees almost always win)
+- Aggressive feature selection (trees handle irrelevant features naturally)
+- Post-hoc calibration/stretching (rarely helps, can hurt)
 
 ## Phase 3: Write Up (last 30%)
 
-When to enter Phase 3:
-- 3 consecutive versions with <0.002 improvement AND analysis confirms signal exhausted
+Enter Phase 3 when:
+- 3 consecutive versions with <0.5% relative improvement AND analysis confirms signal exhausted
 - Gap to theoretical ceiling < estimation error
 - Time budget running out
 
-What to produce:
-1. Comprehensive error analysis + publication-quality figures
-2. Paper draft (LaTeX if appropriate) with:
-   - The journey (what was tried, what worked)
-   - Information-theoretic analysis (why the ceiling exists)
-   - Key findings (feature importance, failure modes, subgroups)
-3. All figures: consistent style, blue palette, squared panels, clean legends
+Produce:
+1. Comprehensive error analysis with publication-quality figures
+2. Technical report or paper draft:
+   - Experiment journey (what was tried, what worked, what didn't)
+   - Why the ceiling exists (information-theoretic or domain analysis)
+   - Key findings (feature importance, failure modes, subgroup disparities)
+3. Figures: consistent style (use `scripts/plot_style.py`), squared panels, clean legends
 
 ## Communication Rules
 
-- **Never go >30 min without posting an update** (even "still running fold 3/5")
-- **If stuck 30 min with no improvement**: stop and message — "stuck at X, tried Y, hypothesis is Z. Should I pivot?"
-- **If 3 experiments show <0.002 gain**: message before trying a 4th
-- **If uncertain whether an approach is sound**: ask before spending an hour
+- **Never go >30 min without posting an update** (even "running fold 3/5")
+- **If stuck 30 min with no improvement**: message — "stuck at X, tried Y, hypothesis is Z"
+- **If 3 experiments show negligible gain**: message before trying a 4th
+- **If uncertain whether approach is sound**: ask before spending an hour on it
 
 ## Quality Gates
 
-- **Leakage check**: if R² jumps >0.05 in one version, verify before reporting. Check train vs test R².
-- **Overfitting vs ceiling**: if train-test gap >0.20, diagnose (try shallower models, more regularization, or accept info ceiling)
-- **Reproducibility**: fixed random seeds, deterministic CV splits, results must be reproducible
-- **Figures**: publication-quality from the start. Use `references/style_guide.md` for consistent aesthetics.
+- **Leakage check**: if score jumps >5% relative in one version, verify before reporting. Compare train vs test scores.
+- **Overfitting vs ceiling**: if train-test gap is large, diagnose — try shallower models, more regularization, or accept information ceiling
+- **Reproducibility**: fixed random seeds, deterministic CV splits, reproducible results
+- **Figures**: publication-quality from version 1. Use `scripts/plot_style.py`.
 
 ## PROJECT_STATE.md Template
 
-Maintain this file in the working directory. Update after every version.
+Maintain in working directory. Update every version.
 
 ```markdown
 # Project State
 
 ## Task
-[Target variable, metric, dataset location, reporting channel]
+- Target: [variable name]
+- Metric: [R², accuracy, F1, AUC, etc.]
+- Data: [path, N samples, M features]
+- Report to: [channel/method]
+- Time budget: [hours remaining]
 
 ## Current Best
-[Model A: R²=X (method), Model B: R²=Y (method)]
+- [Score and method for each model variant]
 
 ## Theoretical Ceiling
-[Estimated max R² and how it was computed]
+- [Estimated max score, method used, key assumptions]
 
-## What's Been Tried
-| V | Method | R² | Key Finding |
-|---|--------|-----|-------------|
+## Versions Tried
+| V | Method | Score | Key Finding |
+|---|--------|-------|-------------|
 
 ## Active Hypotheses
-1. [Hypothesis + expected gain + evidence]
+1. [Hypothesis + expected gain + supporting evidence]
 
-## What Analysis Shows
-- Residual-feature correlations: [summary]
-- Error correlation across models: [summary]
-- Subgroup performance: [summary]
+## Analysis Summary
+- Residual-feature correlations: [near zero = exhausted, or which features still correlate]
+- Error correlation across models: [>0.95 = no diversity, <0.90 = diversity exists]
+- Subgroup performance: [which groups are easy/hard, any disparities]
 - Signal exhaustion: [yes/no + evidence]
 
 ## Next Steps
-1. [Prioritized list]
+1. [Prioritized by expected impact]
 ```
 
 ## Scripts
 
-- `scripts/ceiling_analysis.py` — k-NN neighbor variance ceiling estimator
-- `scripts/error_analysis.py` — residual correlations, subgroup breakdown, error correlation matrix
-- `scripts/plot_style.py` — shared blue-palette plotting style
+- `scripts/ceiling_analysis.py` — k-NN neighbor variance ceiling estimator (regression)
+- `scripts/error_analysis.py` — residual correlations, subgroup breakdown, model error correlation
+- `scripts/plot_style.py` — shared blue-palette publication plotting style
 
 See `references/checklist.md` for phase-by-phase checklist.
