@@ -2,7 +2,7 @@
 
 A **Claude Code skill** that reproduces the [CoDaS pipeline](https://arxiv.org/abs/2604.14615) (Kim et al., 2026) — a multi-agent system for autonomous discovery and validation of digital biomarkers from wearable sensor + clinical tabular data.
 
-Drop the skill in, point it at a dataset and a clinical target, and Claude Code runs the full six-phase loop end-to-end: profile → hypothesize → statistically test → adversarially validate → mechanistically annotate → write a manuscript-style report.
+Drop the skill in, point it at a dataset and a clinical target, and Claude Code runs the full six-phase loop end-to-end: profile → hypothesize → statistically test → adversarially validate → mechanistically annotate → ship a polished HTML report.
 
 ## What this is for
 
@@ -18,11 +18,13 @@ If you have:
 ```
 
 …will hand back a folder containing:
-- `report.md` — a manuscript-format draft (Title / Abstract / Methods / Results / Discussion / Limitations).
+- **`report.html`** — primary deliverable. Single self-contained file, Apple/Google design quality. Hero stats + animated Δ R² gauge, forest plot of candidate effect sizes with 95% CIs, validation-battery heatmap (candidates × 11 tests), per-candidate cards with verdict badges and expandable mechanism/debate detail, discovery-trajectory chart (Jaccard convergence + R² progression by round), cohort profile, methods accordion, honest limitations, reproducibility footer with Fact Sheet hash. Light/dark mode, mobile-responsive, WCAG AA, prefers-reduced-motion respected. Open in any browser; no server needed.
 - `summary.json` — machine-readable digest of validated candidates and CV metrics.
 - `phase_C/verdicts.json` — per-candidate pass/fail across all 11 validation tests.
 - `phase_E/fact_sheet.json` — the deterministic ground-truth numbers all prose was copied from.
+- `phase_E/reviewer_flags.json` — final QC findings from the Reviewer agent.
 - `audit.log` — every agent invocation, every Python subprocess.
+- `report.md` — *only if `--with-paper` is set.* Manuscript-format markdown for arXiv-style submission.
 
 ## About the paper
 
@@ -134,36 +136,74 @@ For a fast smoke test (smaller permutation + bootstrap counts, fewer rounds):
 
 | Knob | Default | Where it's used |
 |------|---------|------------------|
-| Discovery rounds | 5 | Phase B GapChecker stop |
+| Discovery rounds | 4 | Phase B; Jaccard convergence at 0.80 typically exits at round 3 |
 | Permutation iterations | 1000 | Test 2 |
 | Bootstrap iterations | 1000 | Test 3 |
-| CV folds | 5 | All ML evaluation |
-| FDR α | 0.05 | Benjamini-Hochberg correction |
-| Hard-gate threshold | \|ρ\| > 0.85 | Tests 7, leakage screen |
+| CV folds | 5 | `GroupKFold` keyed by participant ID |
+| FDR α | 0.05 | Benjamini–Hochberg, per-round across full univariate family |
+| Hard-gate threshold | \|ρ\| > 0.85 | Test 7 + leakage construct-overlap screen |
 | Min validated effect size | \|ρ\| ≥ 0.10 | Verdict downgrade rule |
 | Discriminative AUC floor | 0.55 | Test 11 |
+| Composite share target | ≥40% of proposals | Hypothesis-agent prior (paper: composites |ρ|=0.28 vs raw 0.21) |
+| Imputation strategies | median, KNN-5, iterative | Phase E sensitivity check (Δρ < 0.01 stability) |
+
+**Flags:**
+- `--quick` — perm/bootstrap → 200, rounds → 2. Draft only.
+- `--with-paper` — also emit `report.md` manuscript draft.
+- `--no-literature` — skip Researcher ensemble (ablation).
+- `--seed=<int>` — fix RNG seed (default 42).
+
+## Expected runtime & cost
+
+Per the paper (DWB N=7,497, on a single machine):
+- **Wall clock**: 6–8.5 hours end-to-end.
+- **Tokens**: ~7M in / ~200K out.
+- **LLM cost**: ~$4.
+- **Smaller cohorts** (WEAR-ME-class N~1k): 2–3 hours.
+
+**Models**: high-reasoning model for Scout / Hypothesis / Critic / Defender / Mechanism / Section-writer roles; low-latency model for repeated lower-stakes tasks (paper verifier, numeric verifier, per-candidate annotation). Within Claude Code, this is the default Opus + Sonnet/Haiku Agent dispatch — no extra config needed.
 
 ## Outputs
 
 ```
 <output_dir>/
-├── report.md                    # manuscript-style draft
-├── summary.json                 # digest: n_validated, top candidates, CV metrics
+├── report.html                  # PRIMARY DELIVERABLE — single-file interactive report
+├── report.md                    # OPTIONAL — only with --with-paper flag
+├── summary.json                 # digest: n_validated, top candidates, CV metrics, reviewer flags
 ├── audit.log                    # every agent + every Python subprocess
 ├── phase_A/
 │   ├── schema.json              # dataset profile from Scout
 │   ├── eda.json                 # missingness, correlations, target distribution
 │   └── literature_priors.json   # established biomarkers + pathways from Researcher
 ├── phase_B/
-│   └── round_<k>/stats.parquet  # per-round candidate stats
+│   ├── round_<k>/stats.parquet  # per-round candidate stats
+│   └── convergence.json         # Jaccard-per-round + R² progression
 ├── phase_C/
 │   └── verdicts.json            # per-candidate × per-test results + Critic/Defender adjudications
 ├── phase_D/
 │   └── annotations.json         # mechanism / novelty / strategy notes
 └── phase_E/
-    ├── fact_sheet.json          # ground-truth numbers
-    └── corrections.log          # what the numeric verifier auto-corrected in the draft
+    ├── fact_sheet.json              # ground-truth numbers (source of truth for report.html)
+    ├── imputation_sensitivity.json  # Δρ across {median, KNN-5, iterative}
+    ├── reviewer_flags.json          # final QC pass — hallucinations / stat errors / contradictions
+    └── corrections.log              # what the numeric verifier auto-corrected
 ```
+
+### What the HTML report contains
+
+1. **Hero** — three big stat cards: validated count, Δ R², top candidate.
+2. **Executive summary** — 3 plain-language sentences.
+3. **Top candidates** — sortable cards with verdict badges (✅ validated / ⚠️ conditional / ❌ rejected), novelty stars, ρ + 95% CI, expandable mechanism + 11-test detail + Critic↔Defender debate snippets.
+4. **Validation battery heatmap** — interactive: candidates × 11 tests, click-to-filter.
+5. **Performance** — bar chart of demographics-only vs +biomarkers, with per-fold scatter.
+6. **Discovery trajectory** — Jaccard convergence + R² progression by round.
+7. **Cohort profile** — demographic donut, target histogram, missingness bar.
+8. **Methods** — accordion with the 6-phase pipeline diagram (inline SVG), validation battery spec, leakage guards.
+9. **Limitations** — softer-toned section; auto-includes the standard CoDaS caveats.
+10. **Reproducibility** — Fact Sheet hash, run config, seed, model versions.
+11. **Footer** — collapsible BibTeX, "Generated by CoDaS skill — Claude Code".
+
+Built to satisfy the seven user-study quality dimensions from paper §6.1 (Novelty, Soundness, Presentation, Plausibility, Statistical Validity, Reproducibility, Limitations) — the dimensions on which CoDaS scored 3.1–4.1 vs 1.3–2.6 for baselines in blind expert review.
 
 ## Limitations and honest caveats
 
