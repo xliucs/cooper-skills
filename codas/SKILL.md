@@ -62,12 +62,25 @@ Run a Python script that writes `<output_dir>/phase_A/eda.json`:
 - Subgroup counts (sex, age decade) for later subgroup-consistency tests.
 
 ### A3. Researcher ensemble
-Spawn an Agent (or sequence) with WebSearch/WebFetch access:
-- **Literature searcher**: 3–5 PubMed/Google Scholar queries on `<target>` + "wearable" / "digital biomarker" / "passive sensing". Collect top 20 abstracts.
-- **Paper verifier**: for any claim that will be cited, confirm the paper exists (DOI or arXiv resolves).
+Spawn an Agent (or sequence) with `WebSearch` and `WebFetch` access — both are built-in Claude Code tools, no setup required.
+
+**Search strategy (in priority order):**
+1. **arXiv** — best signal-to-noise. `WebFetch` directly on `https://arxiv.org/abs/<id>` or `https://arxiv.org/list/q-bio/recent`. Returns clean abstract + metadata.
+2. **PubMed** — `WebSearch` with `"<topic> site:pubmed.ncbi.nlm.nih.gov"` then `WebFetch` each hit. No fielded MeSH search natively, so use plain-English queries.
+3. **Google Scholar** — `WebSearch` works for ranking; some result pages are Cloudflare-protected. If `WebFetch` returns a 403 or a challenge page, fall through to Playwright (per global CLAUDE.md: `NODE_PATH=/opt/homebrew/lib/node_modules node script.js` with headless Chrome) — never give up on a 403.
+
+**Optional augmentation (recommended for production runs):** if a PubMed MCP server is installed (e.g., `mcp__pubmed__search` for proper E-utilities access with MeSH terms, date ranges, and author filters), prefer it over the plain `WebSearch` path. Check `claude plugin marketplace list` for available servers before falling back to web search.
+
+**What to collect:**
+- **Literature searcher**: 3–5 queries combining `<target>` + {"wearable", "digital biomarker", "passive sensing", "actigraphy", "PPG"}. Collect top 20 abstracts.
+- **Paper verifier**: before citing anything, confirm the paper exists — `WebFetch` the DOI or arXiv URL and check it resolves to a real paper, not a 404 or a hallucinated title.
 - **Mechanism extractor**: produce a structured JSON of `{established_biomarkers: [...], pathways: [...], known_confounders: [...]}` saved to `<output_dir>/phase_A/literature_priors.json`.
 
 Pass `literature_priors.json` to all downstream agents as biological-anchor context.
+
+**Hard limits to respect:**
+- No authenticated databases (Embase, Scopus, Web of Science) — those need user-supplied credentials and are out of scope for this skill.
+- Cap total search calls at ~30 per run to keep wall time bounded; if more depth is needed, raise it explicitly.
 
 ---
 
