@@ -94,12 +94,13 @@ Run for at most **N=4 rounds** by default (paper used 4; converged by round 3 on
 
 ### B1. Hypothesis agent
 Agent invocation, given `schema.json` + `literature_priors.json` + prior-round results:
-- Propose 10–30 candidate features. Each entry: `{name, formula (Python expression over existing columns), rationale, mechanistic_link (cite literature_priors), est_effect_direction, type ∈ {raw, ratio, variability, composite}}`.
-- **Bias toward composites.** The paper found composites have mean |ρ|=0.28 vs 0.21 for their constituent raw features — a real signal-amplification effect. Aim for ≥40% of proposals to be composites or variability summaries, not raw columns.
+- Propose 10–30 candidate features. Each entry: `{name, formula (Python expression over existing columns), rationale, mechanistic_link (cite literature_priors entry id; null if ad hoc), est_effect_direction, type ∈ {raw, ratio, variability, composite}, derivation ∈ {ad_hoc, literature_grounded}}`.
+- **Bias toward composites.** Composites and variability summaries typically outperform their constituent raw features (paper observed ≈33% gain in mean |ρ|: 0.28 vs 0.21). Aim for ≥40% of proposals to be composites or variability summaries.
 - Mix three types:
   (a) **Raw** existing columns (anchor set).
-  (b) **Ratios / composites** motivated by literature (canonical examples from the paper: `steps / resting_hr` = cardiovascular fitness index; `AST / ALT` = De Ritis ratio; `night_app_usage / day_app_usage` = night/day ratio; `hedonic_apps / productivity_apps` = anhedonia proxy; `HRV / RHR` = autonomic balance; `albumin / globulin`).
-  (c) **Variability summaries** (rolling SD, IQR, MAD, polyphasic-sleep-percentage, sleep onset SD) — circadian-instability features dominate the depression results.
+  (b) **Ratios / composites** — propose physiologically- or behaviorally-motivated combinations of two or more columns. Reason from the schema and the target's biology, not from memorized paper biomarkers.
+  (c) **Variability summaries** (intra-individual SD, IQR, MAD, CV; trend slopes; entropy if temporal columns exist).
+- **Anti-memorization clause** (non-negotiable for autonomous-discovery integrity): you must NOT propose any composite that you recognize as having been named in published wearable-biomarker literature you may have seen during training. If a composite you're about to propose is identifiable as a paper-named biomarker — e.g. activity-to-heart-rate fitness indices, HRV-to-HR autonomic-balance ratios, AST/ALT hepatic ratios, TG/HDL or non-HDL atherogenic ratios, named circadian-instability indices, named night/day digital-behavior ratios — discard it and derive something else from first principles on this dataset's schema. Set `derivation: "ad_hoc"` and explain in `rationale` why this composite is motivated by the schema rather than retrieved. The Critic agent in B4 must reject any proposal whose `derivation: "literature_grounded"` cites only general-knowledge memorization rather than a specific entry in `literature_priors.json`.
 - Forbidden: any feature whose formula touches `excluded_features` directly or via algebraic transform of the target.
 
 ### B2. Statistical runner (deterministic Python)
