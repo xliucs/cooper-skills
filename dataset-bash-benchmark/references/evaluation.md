@@ -47,7 +47,7 @@ Publish both coverage and outcomes. A complete scheduled-attempt table may count
 
 ## Statistics and reporting
 
-Report per-model strict success, partial reward if used, task/control/subgroup breakdowns, execution status counts, time/actions/tokens and image usage. Distinguish preserved input, changed output and no valid artifact for repair tasks. Diagnostic prose is not an automatic label of correct understanding.
+Report the upstream primary metric per model, task/control/subgroup breakdowns, execution status counts and time/actions/tokens. Report strict success only when the task defines it; do not invent a pass threshold for continuous rewards. Include image usage only when applicable. Distinguish preserved input, changed output and no valid artifact for repair tasks. Diagnostic prose is not an automatic label of correct understanding.
 
 Use paired uncertainty, such as bootstrap differences at the independent sampling unit and exact paired tests for binary outcomes. With repeated trials or multiple windows per subject, cluster appropriately; do not treat them as independent subjects. Specify strata, seeds and repetitions; adjust multiple planned pairwise tests when appropriate. A one-rollout pilot cannot estimate same-task stochastic variance reliably.
 

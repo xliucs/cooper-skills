@@ -17,7 +17,7 @@ Identify the dataset/version, intended problem, host/runtime, requested models, 
 
 When the source lacks suitable tasks, possible objectives include cleaning or repairing records, reconstructing ordering, deriving an analysis, writing a transformation, debugging a data pipeline, and prediction against held-out labels. Choose tasks supported by the data; do not force every dataset into sensor repair.
 
-If the user requests a small scaling pilot without specifying its size, propose **50 tasks, one attempt per model/task**, with a separate small development set. Explicitly state the resulting run count. Select wall-time and action budgets after development smoke tests; expose them in the plan. Do not silently add repetitions, extra model families, or budget sweeps. Use low concurrency initially and account for the subscription's shared limits.
+If the user requests a small scaling pilot without specifying its size, propose **50 tasks, one attempt per model/task**, with a separate small development set. Explicitly state the resulting run count. Retain upstream wall-time and action budgets by default. Use development smoke tests to choose budgets only when the source does not define them, or when the user requests a separate budget condition; expose the choices in the plan. Do not silently add repetitions, extra model families, or budget sweeps. Use low concurrency initially and account for the subscription's shared limits.
 
 ## 1. Acquire and inspect the actual data
 
