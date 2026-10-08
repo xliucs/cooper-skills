@@ -10,7 +10,7 @@ Record client version, supported flags, active authentication mode, account-visi
 
 Keep changes to the experiment's child-process environment/configuration. Do not log out the user's normal client or overwrite global settings. Unsetting an API-key variable alone is insufficient: inspect active profiles, key helpers, custom endpoints and cloud-provider settings as well. Avoid loading unrelated skills, memories, hooks, MCP servers or personal AGENTS/CLAUDE instructions into an evaluated actor. Retain necessary account authentication using supported client mechanisms and audit the effective context.
 
-The native client runs on the trusted side of the environment boundary described in [environment.md](environment.md). A headless CLI command alone does not implement task isolation, budgets, an image bridge, or terminal submission. If using Harbor, inspect its actual agent implementation and auth requirements first: its [published integration example](https://docs.harborframework.com/agents/pre-integrated-agents) uses an API key. Do not assume the installed adapter supports subscriptions because it invokes the same CLI.
+The native client runs on the trusted side of the environment boundary described in [environment.md](environment.md). A headless CLI command alone does not implement task isolation, budgets, terminal submission, or an optional image bridge. If using Harbor, inspect its actual agent implementation and auth requirements first: its [published integration example](https://docs.harborframework.com/agents/pre-integrated-agents) uses an API key. Do not assume the installed adapter supports subscriptions because it invokes the same CLI.
 
 ## Codex
 
@@ -49,7 +49,7 @@ Do not assume the separately distributed Agent SDK accepts subscription authenti
 
 ## Canary, limits and recovery
 
-For each model, execute a disposable task that reads a tiny dataset, performs at least two dependent tool actions, creates and receives a plot, writes an artifact and submits. Verify the graded artifact, tool routing, model evidence, image-delivery evidence, deadline handling and cleanup. This canary must not reveal scored task solutions or count toward their denominator.
+For each model, execute a disposable task that uses a small development task through the actual upstream CLI/API, performs at least two dependent tool actions, and submits in the upstream format. Include plot creation and pixel delivery only if the chosen environment exposes visual tools. Verify the graded artifact, tool routing, model evidence, image-delivery evidence when applicable, deadline handling and cleanup. This canary must not reveal scored task solutions or count toward their denominator.
 
 Start with one or a few workers; increase only within the plan's limits. Account for cumulative shared subscription usage. On capacity/rate/auth errors, save the failed attempt and stop or back off new dispatch according to the frozen policy. Do not switch accounts, models or billing modes to keep a graph moving.
 

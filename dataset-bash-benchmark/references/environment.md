@@ -2,11 +2,17 @@
 
 Read this when implementing the environment, tools, task packaging, and grader.
 
+## Reuse the upstream environment
+
+Inspect and run the source’s supported CLI/API, task exporter, example policy and verifier before creating replacements. Retain its task prompt, observation restrictions, state transitions, action-counting rules, default budget, terminal submission and metric semantics. Keep subscription authentication outside the evaluated workspace and route native client tool calls into the existing terminal interface. Provision missing runtime dependencies when feasible; absent Docker/Harbor is a setup task, not a reason by itself to redesign the benchmark.
+
+Audit known upstream leakage and shortcuts. Use the source’s corrected interface when available. Preserve required temporal cutoffs and server-side answer filtering. Record exact source revisions and separate adapter changes from any task changes. A custom adapter invoking the upstream CLI is not itself a Harbor run; disclose which layer was actually executed.
+
 ## Boundary between builder, actor and grader
 
 Use three distinct contexts:
 
-- **Builder/controller:** downloads data, selects splits, creates tasks, starts agents and records outcomes. It may see all sources and labels.
+- **Builder/controller:** downloads data, selects splits, reuses or creates tasks, starts agents and records outcomes. It may see all sources and labels.
 - **Actor workspace:** one task's permitted input, schema, task text and writable scratch/output. It must not contain builder notes, evaluation reports, labels, other tasks, the source repository or the skill that built the benchmark.
 - **Trusted grader:** receives a frozen copy of the submitted artifact after actor execution ends. It alone receives private answers and scoring code. Return terminal reward to the trainer; do not feed it back into a scored rollout.
 
@@ -14,17 +20,17 @@ Use an actual process/filesystem boundary. A `private/` sibling folder, a workin
 
 Prefer an isolated container/VM per episode, bounded CPU/RAM/disk/process counts, and no actor network after provisioning unless the task explicitly requires it. Keep the authenticated model client on the trusted side with provider connectivity; route its execution/image tools to the task sandbox. The actor shell should have neither the client credentials nor unrestricted host tools. If a native sandbox is the only practical backend, test its boundaries and disclose its limits.
 
-For a shared tool bridge, provide Bash execution, image reading and submission through supported MCP or native integration points. Native shell, file-read, browser, search, and delegation tools must not offer a route around that boundary. Disable unneeded capabilities with supported controls and audit unexpected calls. If enforceable restriction is unavailable, label the setup cooperative; do not claim a hardened sandbox.
+For a shared tool bridge, provide the terminal execution and submission capabilities required by the upstream contract, with image reading only when useful through supported MCP or native integration points. Native shell, file-read, browser, search, and delegation tools must not offer a route around that boundary. Disable unneeded capabilities with supported controls and audit unexpected calls. If enforceable restriction is unavailable, label the setup cooperative; do not claim a hardened sandbox.
 
 ## Packages and state
 
-A useful CPU starting point is Bash, coreutils, `find`, `sed`, `awk`, `jq`, `ripgrep`, Python, NumPy, pandas, SciPy, matplotlib, Pillow and pytest. Add pyarrow/DuckDB, scikit-learn, h5py, soundfile, ffmpeg or domain readers only when needed. Download tools belong in provisioning when the actor does not need network access. Pin the base image digest, Python version and resolved dependency versions; record the installed inventory.
+Start with the source’s declared runtime. A minimal general terminal may need Bash, coreutils, `jq`, `ripgrep` and Python; numerical or visual tasks may additionally need NumPy, pandas, SciPy, matplotlib and Pillow. Do not require these libraries for every task. Add pyarrow/DuckDB, scikit-learn, h5py, soundfile, ffmpeg or domain readers only when needed. Download tools belong in provisioning when the actor does not need network access. Pin the base image digest, Python version and resolved dependency versions; record the installed inventory.
 
 Keep filesystem changes throughout an episode. Define shell semantics explicitly: separate Bash calls need not preserve exported variables or `cd`; provide a fixed workdir or a real persistent shell and test the chosen behavior. A fresh episode resets both files and conversation state. Seed generation/splits independently of any model sampling control; do not imply that a CLI seed makes model outputs deterministic.
 
 ## Multi-turn action loop
 
-Expose a small, provider-neutral contract, adapted to the chosen framework:
+Preserve an existing framework’s contract. When a new adapter is needed, expose a small provider-neutral loop such as:
 
 ```python
 observation, info = env.reset(task_id=task_id)
@@ -38,10 +44,10 @@ while True:
 | Action | Observation / effect |
 |---|---|
 | `bash(command, timeout)` | Execute in the same task filesystem; return exit status, bounded stdout/stderr, and timeout status. |
-| `view_image(path)` | Validate a workspace image, decode it, and deliver image pixels through the client's actual image-capable tool path. |
+| `view_image(path)` (optional) | Validate a workspace image, decode it, and deliver image pixels through the client's actual image-capable tool path. |
 | `submit(artifact_path, report)` | End the episode once; controller snapshots and validates the artifact, then runs the private grader. |
 
-Saving a PNG or returning its filename/base64 as plain text is not evidence that the model saw it. Preserve the actual image payload or a trustworthy client event with its hash and delivery status. Distinguish created, tool-returned and model-consumed images; label consumption unverified if the client cannot attest it.
+When image reading is enabled, saving a PNG or returning its filename/base64 as plain text is not evidence that the model saw it. Preserve the actual image payload or a trustworthy client event with its hash and delivery status. Distinguish created, tool-returned and model-consumed images; label consumption unverified if the client cannot attest it.
 
 Enforce total actions, per-command wall time, overall wall time, output length and artifact size in the controller, not only in the prompt. Count each tool action inside batches; define whether submission consumes a slot. Model turns, Bash actions, parallel calls and tokens are different quantities. A client `max_turns` flag is not a shell-action limit.
 
@@ -57,7 +63,7 @@ For reconstruction, score the observable requested result and accept valid equiv
 
 ## Harbor packaging
 
-Use the [current Harbor task format](https://docs.harborframework.com/tasks/overview) and the installed version's schema. Typical components are:
+Reuse an upstream Harbor exporter when supplied; validate its output against the [current Harbor task format](https://docs.harborframework.com/tasks/overview) and the installed version's schema. Typical components are:
 
 ```text
 task-id/

@@ -4,6 +4,8 @@ Read this before launching scored inference and when generating the report.
 
 ## Record the experiment contract
 
+Identify which upstream tasks, prompts, CLI/environment, default budgets and graders are reused verbatim, and list every intentional deviation. Audit both upstream restrictions and adapter tool routing.
+
 The frozen manifest must identify:
 
 - Dataset version/checksums, split units, task IDs, construction seeds and any task admission rule.
@@ -59,7 +61,7 @@ Before delivery, verify task/model grid completeness and duplicates; regrade tru
 
 Keep source and small manifests in the requested repository. Keep newly created benchmark repos private by default. For large data or trajectory archives, use authorized private artifact storage/release assets with hashes and retrieval instructions instead of bloating Git history. Honor dataset redistribution limits. Include:
 
-1. Acquisition and EDA summary, concrete environment plan, reproducible task builder and package/runtime lock.
+1. Acquisition and inspection summary, concrete environment plan, upstream task exporter or necessary builder, adapter changes and package/runtime lock.
 2. Public task packages, separately protected private verifier, and tested multi-turn runner or RL `reset`/`step` interface.
 3. Frozen experiment manifest, complete attempt ledger, model identity evidence, submitted-artifact hashes and regrade results.
 4. HTML report and machine-readable tables; a runnable notebook when requested, clearly labeled inference versus replay.
