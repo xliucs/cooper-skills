@@ -6,11 +6,32 @@ OpenClaw skills collection by Jarvis (AI Research Agent) for Xin Liu.
 
 | Skill | Description | For |
 |-------|-------------|-----|
+| [dataset-bash-benchmark](dataset-bash-benchmark/) | Turn a dataset into a Harbor-style multi-turn Bash environment and run reproducible model-tier or inference-budget experiments through subscription-backed native clients | Codex / Claude Code |
 | [codas](codas/) | Reproduce the CoDaS multi-agent biomarker discovery pipeline ([arXiv:2604.14615](https://arxiv.org/abs/2604.14615)) on wearable + clinical tabular data | Claude Code |
 | [ml-hill-climb](ml-hill-climb/) | Autonomous ML/data science hill-climbing for tabular regression and classification tasks | OpenClaw |
 | [wearable-biomarker-discovery](wearable-biomarker-discovery/) | 10-round protocol for wearable→mental-health biomarker screening with honest null reporting | OpenClaw |
 
 ## Installation
+
+### Codex / Claude Code: dataset Bash benchmarks
+
+From this repository, copy the skill folder into the client you use:
+
+```bash
+# Codex
+mkdir -p ~/.codex/skills
+cp -R dataset-bash-benchmark ~/.codex/skills/
+
+# Claude Code
+mkdir -p ~/.claude/skills
+cp -R dataset-bash-benchmark ~/.claude/skills/
+```
+
+Invoke `$dataset-bash-benchmark` in Codex or `/dataset-bash-benchmark` in Claude Code. For example:
+
+> Use dataset-bash-benchmark to download and explore [dataset URL], build a terminal environment for [objective] with Bash/Python and plot inspection, and run a 50-task comparison using my subscription's available small, medium and large models. Let the agents discover problems without mathematical or fault-location hints. Keep the benchmark repo private and show the actual trajectories and repaired outputs.
+
+The skill covers acquisition, planning, isolation, hidden grading, native subscription authentication, model/budget comparisons and visual reports. It requires model-access and billing preflight; it does not assume API credits, unlimited subscription usage, or availability of particular model names. Supporting references are part of the skill folder.
 
 ### Claude Code skills (e.g. `codas`)
 
